@@ -1,0 +1,39 @@
+import socket
+import numpy as np
+import tensorflow as tf
+
+# --- CONFIG ---
+UDP_PORT = 6000
+BUFFER_SIZE = 1024
+MODEL_PATH = 'your_model.h5'  # or path to SavedModel directory
+
+# --- LOAD MODEL ---
+model = tf.keras.models.load_model(MODEL_PATH)
+print("Model loaded successfully.")
+
+# --- PREPROCESS FUNCTION ---
+def preprocess(data_str):
+    """
+    Converts comma-separated string into NumPy array for model input.
+    Example input: "23.5,41.2,0.98"
+    """
+    values = list(map(float, data_str.strip().split(',')))
+    input_array = np.array([values])  # batch size = 1
+    return input_array
+
+# --- UDP LISTENER ---
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(('', UDP_PORT))
+print(f"Listening for UDP data on port {UDP_PORT}...")
+
+while True:
+    data, addr = sock.recvfrom(BUFFER_SIZE)
+    decoded = data.decode('utf-8').strip()
+    print(f"Received from {addr}: {decoded}")
+
+    try:
+        input_data = preprocess(decoded)
+        prediction = model.predict(input_data)
+        print(f"Model prediction: {prediction}")
+    except Exception as e:
+        print(f"Error processing input: {e}")
