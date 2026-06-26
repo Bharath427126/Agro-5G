@@ -1,0 +1,95 @@
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score
+from imblearn.over_sampling import SMOTE
+
+# Load the dataset
+file_path = "Crop_recommendation.csv"
+df = pd.read_csv(file_path)
+
+# Drop the 'rainfall' column
+df = df.drop(columns=['rainfall'])
+
+# Encode the categorical target variable
+label_encoder = LabelEncoder()
+df['label'] = label_encoder.fit_transform(df['label'])
+
+# Split features and target
+X = df.drop(columns=['label']).values
+y = df['label'].values
+
+# Normalize features
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+# Apply SMOTE to handle class imbalance
+smote = SMOTE()
+X, y = smote.fit_resample(X, y)
+
+# Split into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Plot correlation heatmap (optional)
+plt.figure(figsize=(10, 8))
+sns.heatmap(pd.DataFrame(X_train).corr(), annot=True, cmap="coolwarm")
+plt.title("Feature Correlation Heatmap")
+plt.show()
+
+# Define different models
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=500),
+    "Random Forest": RandomForestClassifier(n_estimators=100),
+    "SVM": SVC(),
+    "KNN": KNeighborsClassifier(n_neighbors=5),
+    "Naive Bayes": GaussianNB(),
+    "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="mlogloss"),
+}
+
+# Train and evaluate each model
+accuracy_results = {}
+
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    accuracy_results[name] = accuracy
+    print(f"{name} Accuracy: {accuracy:.4f}")
+
+# Neural Network Model
+nn_model = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(32, activation='relu', input_shape=(X_train.shape[1],)),
+    tf.keras.layers.Dropout(0.3),
+    tf.keras.layers.Dense(32, activation='relu'),
+    tf.keras.layers.Dropout(0.3),
+    tf.keras.layers.Dense(16, activation='relu'),
+    tf.keras.layers.Dense(len(np.unique(y)), activation='softmax') # Output layer for classification
+])
+
+# Compile the model with a lower learning rate
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
+nn_model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model with more epochs
+nn_model.fit(X_train, y_train, epochs=50, batch_size=16, validation_data=(X_test, y_test), verbose=0)
+
+# Evaluate the model
+test_loss, nn_accuracy = nn_model.evaluate(X_test, y_test, verbose=0)
+accuracy_results["Neural Network"] = nn_accuracy
+print(f"Neural Network Accuracy: {nn_accuracy:.4f}")
+
+# Print sorted results
+print("\nSorted Model Accuracy Results:")
+for model, acc in sorted(accuracy_results.items(), key=lambda x: x[1], reverse=True):
+    print(f"{model}: {acc:.4f}")
