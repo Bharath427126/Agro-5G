@@ -1,0 +1,41 @@
+import socket
+import numpy as np
+import joblib
+
+# --- CONFIG ---
+UDP_PORT = 6000
+BUFFER_SIZE = 1024
+MODEL_PATH = 'crop_model.pkl'  # Your trained model file
+
+# --- LOAD MODEL ---
+model = joblib.load(MODEL_PATH)
+print("ML model loaded successfully.")
+
+# --- EXTRACT + PREDICT ---
+def parse_csv_input(msg):
+    """
+    Parses comma-separated values: '25.0,55.0'
+    Returns a NumPy array [[temperature, humidity]]
+    """
+    try:
+        temp, hum = map(float, msg.strip().split(','))
+        return np.array([[temp, hum]])
+    except ValueError:
+        raise ValueError(f"Invalid input format: {msg}")
+
+# --- UDP LISTENER ---
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(('', UDP_PORT))
+print(f"Listening for CSV UDP data on port {UDP_PORT}...")
+
+while True:
+    data, addr = sock.recvfrom(BUFFER_SIZE)
+    msg = data.decode('utf-8').strip()
+    print(f"Received from {addr}: {msg}")
+
+    try:
+        input_data = parse_csv_input(msg)
+        prediction = model.predict(input_data)
+        print(f"Suggested Crop: {prediction[0]}")
+    except Exception as e:
+        print(f"Error: {e}")
